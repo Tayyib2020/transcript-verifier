@@ -1,0 +1,32 @@
+[
+  {
+    "name": "accurate summary",
+    "transcript": "The team is prioritizing Clarke's readiness and wants no known launch-blocking problems before release. No launch date is confirmed.",
+    "summary": "The team is focused on Clarke being ready and free of known blockers, and has not confirmed a launch date.",
+    "expected_decision": "ACCEPTED"
+  },
+  {
+    "name": "fabricated announcement",
+    "transcript": "The team discussed Clarke's readiness and answered questions about the roadmap.",
+    "summary": "The team announced that Clarke launches next week.",
+    "expected_decision": "REJECTED"
+  },
+  {
+    "name": "changed certainty",
+    "transcript": "The team may open a community testnet later this quarter, but no date is confirmed.",
+    "summary": "The team will open the community testnet later this quarter.",
+    "expected_decision": "REJECTED"
+  },
+  {
+    "name": "different wording, same meaning",
+    "transcript": "Edgars said the release will depend on readiness rather than a calendar deadline, and the team is tracking remaining blockers.",
+    "summary": "Edgars explained that the release is gated by readiness and remaining blockers, not by an arbitrary date.",
+    "expected_decision": "ACCEPTED"
+  },
+  {
+    "name": "missing important context",
+    "transcript": "The team is exploring a token utility proposal, but this is only an early possibility and no decision has been made.",
+    "summary": "The team decided to implement the token utility proposal.",
+    "expected_decision": "REJECTED"
+  }
+]

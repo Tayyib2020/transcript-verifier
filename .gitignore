@@ -1,0 +1,14 @@
+.venv/
+.venv-linux/
+__pycache__/
+.pytest_cache/
+.env
+*.pyc
+artifacts/
+
+# Local tooling and editor files
+.mypy_cache/
+.ruff_cache/
+.idea/
+.vscode/
+*.swp

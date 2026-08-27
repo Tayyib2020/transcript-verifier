@@ -16,6 +16,13 @@ This verifies summary fidelity to the supplied transcript. It does not prove
 that the transcript is truthful, that speakers were correctly identified, or
 that any claim in the transcript is factually correct.
 
+## Deployed TranscriptVerifier V2
+
+The attempt-aware V2 contract used by Signal Ledger is deployed on GenLayer
+Bradbury at:
+
+`0x4DEfE1bbE75C59FcD2264EaCb75096f3CD659f5B`
+
 ## A reusable semantic-fidelity primitive
 
 TranscriptVerifier is not limited to GenLayer AMAs. It is a general-purpose
@@ -93,9 +100,22 @@ python scripts/hash_transcript.py transcript.txt
 A matching hash proves only that the evaluated string has not changed. It does
 not establish that the transcript itself is accurate or complete.
 
-The first consensus result wins for a hash; later submissions cannot overwrite
-it. This keeps the public record unambiguous, but this version intentionally
-supports one candidate summary per transcript hash.
+The first consensus result wins for the legacy transcript-hash identity; later
+submissions cannot overwrite it.
+
+### `submit_verification_attempt(transcript, proposed_summary, transcript_hash, verification_id)`
+
+The attempt-aware method preserves `transcript_hash` as the SHA-256 digest of
+the exact canonical transcript while allowing a different summary to receive a
+different deterministic identity. The required identity is:
+
+```text
+summary_hash = "0x" + SHA256(exact proposed summary UTF-8 bytes).hexdigest()
+verification_id = "0x" + SHA256(transcript_hash + ":" + summary_hash).hexdigest()
+```
+
+The contract recomputes both values and rejects mismatches. This method is part
+of the deployed Bradbury V2 contract above.
 
 ## Why GenLayer is appropriate
 
@@ -202,21 +222,15 @@ genlayer write <CONTRACT_ADDRESS> submit_verification --args <TRANSCRIPT> <SUMMA
 For long values, use the GenLayer JS/Python SDK or Studio UI rather than shell
 quoting. Never put a private key in this repository or browser code.
 
-### Bradbury test deployment
+### Bradbury V2 deployment
 
-The contract was manually deployed and tested on GenLayer Testnet Bradbury.
-The observed behavior was:
+The attempt-aware TranscriptVerifier V2 contract is deployed on GenLayer
+Testnet Bradbury at:
 
-- faithful paraphrase → `ACCEPTED`
-- fabricated launch claim → `REJECTED`
-- uncertainty changed into confirmation → `REJECTED`
+`0x4DEfE1bbE75C59FcD2264EaCb75096f3CD659f5B`
 
-Bradbury test deployment address:
-
-`0x880a28ECa6e5C015634ff969975B4Ebd2e12aB55`
-
-This address is documented as a test deployment only. No transaction hash or
-additional deployment metadata is asserted here.
+It supports `submit_verification`, `submit_verification_attempt`,
+`get_verification`, and `has_successful_verification`.
 
 ## Submission metadata
 

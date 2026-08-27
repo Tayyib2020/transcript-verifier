@@ -10,6 +10,14 @@ def digest(transcript: str) -> str:
     return "0x" + hashlib.sha256(transcript.encode("utf-8")).hexdigest()
 
 
+def summary_digest(summary: str) -> str:
+    return "0x" + hashlib.sha256(summary.encode("utf-8")).hexdigest()
+
+
+def verification_id(transcript_hash: str, summary_hash: str) -> str:
+    return "0x" + hashlib.sha256(f"{transcript_hash}:{summary_hash}".encode("utf-8")).hexdigest()
+
+
 def test_accurate_summary_is_stored(direct_vm, direct_deploy):
     transcript = "The team is prioritizing Clarke's readiness before release."
     summary = "The team is prioritizing Clarke's readiness before releasing."
@@ -78,6 +86,35 @@ def test_duplicate_hash_cannot_overwrite(direct_vm, direct_deploy):
 
     with direct_vm.expect_revert("A verification already exists"):
         contract.submit_verification(transcript, "A different summary", digest(transcript))
+
+
+def test_different_summary_attempts_have_distinct_identities(direct_vm, direct_deploy):
+    transcript = "The community testnet may open later; no date is confirmed."
+    first_summary = "The community testnet may open later."
+    second_summary = "The community testnet has opened today."
+    direct_vm.mock_llm(r"transcript-summary adjudicator", {
+        "decision": "REJECTED",
+        "reason": "The candidate changes the certainty of the transcript.",
+    })
+
+    contract = direct_deploy(CONTRACT_PATH)
+    transcript_hash = digest(transcript)
+    first_id = verification_id(transcript_hash, summary_digest(first_summary))
+    second_id = verification_id(transcript_hash, summary_digest(second_summary))
+    assert first_id != second_id
+    contract.submit_verification_attempt(transcript, first_summary, transcript_hash, first_id)
+
+    direct_vm.clear_mocks()
+    direct_vm.mock_llm(r"transcript-summary adjudicator", {
+        "decision": "ACCEPTED",
+        "reason": "The second candidate is faithful.",
+    })
+    contract.submit_verification_attempt(transcript, second_summary, transcript_hash, second_id)
+
+    assert contract.get_verification(first_id)["status"] == "REJECTED"
+    assert contract.get_verification(second_id)["status"] == "ACCEPTED"
+    assert contract.get_verification(second_id)["transcript_hash"] == transcript_hash
+    assert contract.get_verification(second_id)["summary_hash"] == summary_digest(second_summary)
 
 
 def test_validator_compares_decision_not_reasoning(direct_vm, direct_deploy):

@@ -17,7 +17,9 @@ SHA256_HEX_LENGTH = 64
 class VerificationRecord:
     """Compact state stored for one transcript hash."""
 
+    transcript_hash: str
     summary: str
+    summary_hash: str
     status: str
     reason: str
     submitted_at: str
@@ -39,13 +41,41 @@ class TranscriptVerifier(gl.Contract):
         proposed_summary: str,
         transcript_hash: str,
     ) -> None:
-        """Evaluate and store one summary for one exact transcript hash."""
+        """Evaluate and store the first summary for one exact transcript hash."""
+
+        self._submit_verification(transcript, proposed_summary, transcript_hash, transcript_hash)
+
+    @gl.public.write
+    def submit_verification_attempt(
+        self,
+        transcript: str,
+        proposed_summary: str,
+        transcript_hash: str,
+        verification_id: str,
+    ) -> None:
+        """Evaluate a later summary using a deterministic transcript/summary identity."""
 
         self._validate_input(transcript, proposed_summary, transcript_hash)
         normalized_hash = transcript_hash.lower()
+        summary_hash = self._summary_hash(proposed_summary)
+        expected_id = self._verification_id(normalized_hash, summary_hash)
+        if verification_id.lower() != expected_id:
+            raise gl.vm.UserError("verification_id does not match the transcript and summary")
+        self._submit_verification(transcript, proposed_summary, transcript_hash, verification_id)
 
-        if normalized_hash in self.verifications:
-            raise gl.vm.UserError("A verification already exists for this transcript hash")
+    def _submit_verification(
+        self,
+        transcript: str,
+        proposed_summary: str,
+        transcript_hash: str,
+        verification_id: str,
+    ) -> None:
+        self._validate_input(transcript, proposed_summary, transcript_hash)
+        normalized_hash = transcript_hash.lower()
+        normalized_id = verification_id.lower()
+
+        if normalized_id in self.verifications:
+            raise gl.vm.UserError("A verification already exists for this verification identity")
 
         calculated_hash = hashlib.sha256(transcript.encode("utf-8")).hexdigest()
         if calculated_hash != normalized_hash[2:]:
@@ -78,8 +108,10 @@ class TranscriptVerifier(gl.Contract):
         if not self._is_valid_evaluation(evaluation):
             raise gl.vm.UserError("The evaluator returned an invalid decision")
 
-        self.verifications[normalized_hash] = VerificationRecord(
+        self.verifications[normalized_id] = VerificationRecord(
+            transcript_hash=normalized_hash,
             summary=proposed_summary,
+            summary_hash=self._summary_hash(proposed_summary),
             status=evaluation["decision"],
             reason=evaluation["reason"],
             submitted_at=gl.message_raw["datetime"],
@@ -93,13 +125,16 @@ class TranscriptVerifier(gl.Contract):
         if not self._is_well_formed_hash(transcript_hash):
             return {}
 
-        record = self.verifications.get(transcript_hash.lower())
+        normalized_id = transcript_hash.lower()
+        record = self.verifications.get(normalized_id)
         if record is None:
             return {}
 
         return {
-            "transcript_hash": transcript_hash.lower(),
+            "verification_id": normalized_id,
+            "transcript_hash": record.transcript_hash,
             "summary": record.summary,
+            "summary_hash": record.summary_hash,
             "status": record.status,
             "reason": record.reason,
             "submitted_at": record.submitted_at,
@@ -145,6 +180,12 @@ class TranscriptVerifier(gl.Contract):
         except (TypeError, ValueError):
             return False
         return True
+
+    def _summary_hash(self, proposed_summary: str) -> str:
+        return "0x" + hashlib.sha256(proposed_summary.encode("utf-8")).hexdigest()
+
+    def _verification_id(self, transcript_hash: str, summary_hash: str) -> str:
+        return "0x" + hashlib.sha256(f"{transcript_hash}:{summary_hash}".encode("utf-8")).hexdigest()
 
     def _build_evaluation_prompt(self, transcript: str, proposed_summary: str) -> str:
         return f"""
